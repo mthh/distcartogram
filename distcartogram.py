@@ -335,7 +335,7 @@ class DistCarto:
     def get_inter_nb_iter(self, coef_iter):
         return int(coef_iter * sqrt(len(self.source)))
 
-    def transform_backgroud(self):
+    def transform_background(self):
         b = self.background.copy()
         b.geometry = [
             transform(self.g._interp_point, geom) for geom in b.geometry]
