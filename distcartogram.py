@@ -269,45 +269,57 @@ class Grid:
     def get_smoothed(self, i, j):
         get_node = self.get_node
         if i > 1 and j > 1 and i < self.height - 2 and j < self.width - 2:
+            a = get_node(i-1, j).interp
+            b = get_node(i+1, j).interp
+            c = get_node(i, j-1).interp
+            d = get_node(i, j+1).interp
+            e = get_node(i-1, j-1).interp
+            f = get_node(i+1, j-1).interp
+            g = get_node(i+1, j+1).interp
+            h = get_node(i-1, j+1).interp
+            _i = get_node(i-2, j).interp
+            _j = get_node(i+2, j).interp
+            k = get_node(i, j-2).interp
+            l = get_node(i, j+2).interp
             return Point(
                 (8 * 
-                 (get_node(i-1, j).interp.x + get_node(i+1, j).interp.x + get_node(i, j-1).interp.x + get_node(i, j+1).interp.x)
-                 -2 * (get_node(i-1, j-1).interp.x + get_node(i+1, j-1).interp.x + get_node(i+1, j+1).interp.x + get_node(i-1, j+1).interp.x)
-                 - (get_node(i-2, j).interp.x + get_node(i+2, j).interp.x + get_node(i, j-2).interp.x + get_node(i, j+2).interp.x)) / 20, 
+                 (a.x + b.x + c.x + d.x)
+                 -2 * (e.x + f.x + g.x + h.x)
+                 - (_i.x + _j.x + k.x + l.x)) / 20, 
                 (8 *
-                 (get_node(i-1, j).interp.y + get_node(i+1, j).interp.y + get_node(i, j-1).interp.y + get_node(i, j+1).interp.y)
-                 -2 * (get_node(i-1, j-1).interp.y + get_node(i+1, j-1).interp.y + get_node(i+1, j+1).interp.y + get_node(i-1, j+1).interp.y)
-                 - (get_node(i-2, j).interp.y + get_node(i+2, j).interp.y + get_node(i, j-2).interp.y + get_node(i, j+2).interp.y)) / 20
+                 (a.y + b.y + c.y + d.y)
+                 -2 * (e.y + f.y + g.y + h.y)
+                 - (_i.y + _j.y + k.y + l.y)) / 20
                     )
         
         nb = sx = sy = 0
         if i > 0:
-            n = get_node(i-1, j)
-            sx += n.interp.x
-            sy += n.interp.y
+            n = get_node(i-1, j).interp
+            sx += n.x
+            sy += n.y
             nb += 1
         else:
             sy += self.scaleY * self.resolution
         if j > 0:
-            n = get_node(i, j - 1)
-            sx += n.interp.x
-            sy += n.interp.y
+            n = get_node(i, j - 1).interp
+            sx += n.x
+            sy += n.y
             nb += 1
         else:
             sx -= self.scaleX * self.resolution
         
         if i < self.height - 1:
-            n = get_node(i+1, j)
-            sx += n.interp.x
-            sy += n.interp.y
+            n = get_node(i+1, j).interp
+            sx += n.x
+            sy += n.y
             nb += 1
         else:
             sy -= self.scaleY * self.resolution
         
         if j < self.width - 1:
-            n = get_node(i, j + 1)
-            sx += n.interp.x
-            sy += n.interp.y
+            n = get_node(i, j + 1).interp
+            sx += n.x
+            sy += n.y
             nb += 1
         else:
             sx += self.scaleX * self.resolution
