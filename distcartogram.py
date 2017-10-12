@@ -199,6 +199,9 @@ class Grid:
         self.scaleX = rect_adj.width / rect.width
         self.scaleY = rect_adj.height / rect.height
         resolution = self.resolution
+        width = self.width
+        height = self.height
+        rect_dim = self.rect_width * self.rect_height
         for k in range(nb_iter):
             for (src_pt, adj_pt) in zip(self.points, img_points):
                 adj_nodes = self.get_adj_nodes(src_pt)
@@ -244,10 +247,10 @@ class Grid:
                     adj_nodes[i].interp.y += adjY
             
             p_tmp = Point(0, 0)
-            for l in range(self.width * self.height):
+            for l in range(width * height):
                 delta = 0
-                for i in range(self.height):
-                    for j in range(self.width):
+                for i in range(height):
+                    for j in range(width):
                         n = self.get_node(i, j)
                         if n.weight == 0:
                             p_tmp.x = n.interp.x
@@ -255,7 +258,7 @@ class Grid:
                             _p = self.get_smoothed(i, j)
                             n.interp.x = _p.x
                             n.interp.y = _p.y
-                            delta = max([delta, p_tmp.distance(n.interp) / self.rect_width * self.rect_height])
+                            delta = max([delta, p_tmp.distance(n.interp) / rect_dim])
                 if l > 5 and sqrt(delta) < 0.0001:
                     break
                 
