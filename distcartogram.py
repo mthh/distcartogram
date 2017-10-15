@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from math import sqrt, radians, cos, sin, asin, ceil, pow as m_pow
 from shapely.ops import transform
+from shapely.geometry import Polygon
+from geopandas import GeoDataFrame
 
 class Node:
     __slots__ = ['weight', 'i', 'j', 'source', 'interp']
@@ -17,6 +19,9 @@ class Point:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+
+    def to_xy(self):
+        return (self.x, self.y)
 
     def geo_distance(self, other):
         return haversine(self.x, self.y, other.x, other.y)
@@ -345,10 +350,32 @@ class DistCarto:
         self.background = background
         rect = background.total_bounds
         self.g = Grid(self.source, precision, rect)
-        self.g.interpolate(self.image, self.get_inter_nb_iter(4))
+        self.g.interpolate(self.image, self._get_inter_nb_iter(4))
 
-    def get_inter_nb_iter(self, coef_iter):
+    def _get_inter_nb_iter(self, coef_iter):
         return int(coef_iter * sqrt(len(self.source)))
+
+    def _get_grid(self, _type='source'):
+        if not _type in ('source', 'interp'):
+            raise ValueError('Invalid grid type requested')
+        grid = self.g
+        polys = []
+        for i in range(grid.height - 1):
+            for j in range(grid.width - 1):
+                polys.append(Polygon([
+                        getattr(grid.get_node(i, j), _type).to_xy(),
+                        getattr(grid.get_node(i + 1, j), _type).to_xy(),
+                        getattr(grid.get_node(i + 1, j + 1), _type).to_xy(),
+                        getattr(grid.get_node(i, j + 1), _type).to_xy(),
+                        getattr(grid.get_node(i, j), _type).to_xy()
+                        ]))
+        return GeoDataFrame(geometry=polys, index=range(len(polys)))
+
+    def get_source_grid(self):
+        return self._get_grid('source')
+
+    def get_interp_grid(self):
+        return self._get_grid('interp')
 
     def transform_background(self):
         b = self.background.copy()
@@ -356,8 +383,3 @@ class DistCarto:
             transform(self.g._interp_point, geom) for geom in b.geometry]
         return b
 
-    def get_source_grid(self):
-        pass
-
-    def get_transform_grid(self):
-        pass
