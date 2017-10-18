@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+html {
+  font-family: Monospace;
+  font-size: 11px;
+}
+
+body {
+  display: flex;
+}
+
+input {
+  width: 70px;
+  margin-left: 10px;
+  margin-right: 10px;
+  float: right;
+}
+
+select {
+  width: 90px;
+  margin-left: 10px;
+  margin-right: 10px;
+  float: right;
+}
+
+.uservalue {
+  height: 18px;
+}
+
+.uservalue > span {
+  margin-left: 5px;
+  margin-right: 5px;
+  float: left;
+}
+.custom_tooltip {
+  position: absolute;
+  background: #595959;
+  border-radius:4px;
+  padding: 6px 12px;
+  font-family: arial;
+  font-size: 12px;
+  text-shadow: 0px 1px 1px #000;
+  color: #ffc64a;
+  z-index: 1001;
+  overflow-wrap: break-word;
+}
+
+</style>
+<svg width="700" height="760"></svg>
+<div style="width:300px;">
+<p class="uservalue">
+  <span>Commune</span><select id="comm"></select><br> </p>
+<p class="uservalue">
+  <span>Facteur de déplacement</span><input type="number" id="factor" value="1"></input><br>
+</p>
+<p class="uservalue">
+  <span>Précision</span><input type="number" id="precision" value="1" max="3" min="0"></input><br>
+</p>
+<p><button id="transform">Transform</button><button id="reset">Reset</button></p>
+</div>
+<script src="//d3js.org/d3.v4.min.js"></script>
+<script src="distcarto.js"></script>
+<script src="//d3js.org/topojson.v3.min.js"></script>
+<script>
+d3.select('#reset').on('click', () => { undo(); });
+d3.select('#transform').on('click', redraw);
+d3.select('#factor').on('change', redraw);
+d3.select('#precision').on('change', redraw);
+d3.select('#comm').on('change', redraw);
+function redraw() {
+  const my_comm = document.getElementById('comm').value;
+  const precision = +document.getElementById('precision').value;
+  const factor = +document.getElementById('factor').value;
+  _do(my_comm, precision, factor);
+};
+const map_zoomed = () => {
+  const transform = d3.event.transform;
+  if (transform.k === 1) {
+    transform.x = 0;
+    transform.y = 0;
+  }
+
+  const t = layers
+    .selectAll('g')
+    .transition()
+    .duration(225);
+
+  layers.selectAll('g')
+    .transition(t)
+    .attr('transform', transform);
+};
+
+const round = Math.round;
+const floor = Math.floor;
+let svg = d3.select('svg'),
+  width = +svg.attr('width'),
+  height = +svg.attr('height');
+const layers = svg.append('g')
+  .attr('id', 'layers');
+
+svg.call(d3.zoom()
+  .scaleExtent([1, 5])
+  .translateExtent([[0, 0], [width, height]])
+  .on('zoom', map_zoomed));
+
+let background, source, image, mat;
+let projection;
+let path;
+let _do;
+let undo;
+
+d3.queue(3)
+  // .defer(d3.json, 'com46.geojson')
+  // .defer(d3.json, 'source.geojson')
+  // .defer(d3.request, 'mat46.csv')
+  .defer(d3.json, 'depfr.geojson')
+  .defer(d3.json, 'source_pref.geojson')
+  .defer(d3.request, 'mat.csv')
+  .awaitAll((error, result) => {
+    if (error) throw error;
+    [background, source, raw_mat] = result;
+    mat = new Mat(raw_mat.response);
+    populateSelect(mat.getAvailableIds());
+    getImageLayer(source, mat, '46042');
+    projection = d3.geoIdentity()
+      .fitExtent([[0, 0], [width, height]], background.features)
+      .reflectY(true);
+    path = d3.geoPath().projection(projection);
+
+    layers.insert('g')
+      .attr('id', 'background')
+      .attr('class', 'layer background')
+      .attr('fill', 'gray')
+      .attr('fill-opacity', 0.8)
+      .attr('stroke', 'white')
+      .selectAll('path')
+      .data(background.features)
+      .enter()
+      .append('path')
+      .attr('d', path);
+
+    layers.insert('g')
+      .attr('id', 'pts')
+      .attr('class', 'layer pts')
+      .attr('fill', 'green')
+      .attr('fill-opacity', 0.2)
+      .attr('stroke', 'black')
+      .attr('sroke-opacity', 0.2)
+      .selectAll('path')
+      .data(source.features)
+      .enter()
+      .append('path')
+      .attr('d', path);
+
+    fitLayer('background');
+    _do = (my_comm='46042', precision=1, factor=1) => {
+      const image2 = getImageLayer(source, mat, my_comm, factor);
+      const source_pts = [];
+      const image_pts = [];
+      const nb_ft = source.features.length;
+      for (let i = 0; i < nb_ft; i++) {
+        source_pts.push(source.features[i].geometry.coordinates);
+        image_pts.push(image2.features[i].geometry.coordinates);
+      }
+      const c = new DistCarto(source_pts, image_pts, background, precision);
+      const result = c.transform_background();
+      layers.selectAll('#background > path')
+        .data(result.features)
+        .transition()
+        .duration(500)
+        .attr("d", path);
+
+       layers.selectAll('#pts > path')
+         .data(image2.features)
+         .transition()
+         .duration(500)
+         .attr('fill', 'red')
+         .attr("d", path);
+    };
+    undo = () => {
+      layers.selectAll('#pts > path')
+        .data(source.features)
+        .transition()
+        .duration(500)
+        .attr('fill', 'green')
+        .attr("d", path);
+
+      layers.selectAll('#background > path')
+        .data(background.features)
+        .transition()
+        .duration(500)
+        .attr("d", path);
+
+    };
+  });
+
+class Mat {
+  constructor(raw_csv) {
+    this.cells = raw_csv.split('\n').map(line => line.split(',').map(el => (el.startsWith('"') && el.endsWith('"')) ? el.slice(1,-1) : el));
+    this.ref_index = this.cells[0];
+  }
+
+  getTime(id_comm) {
+    const ix = this.ref_index.map((d, i) => d === id_comm ? i : 0).reduce((a, b) => a + b);
+    const times = new Map();
+    for (let i = 1; i < this.cells.length; i++) {
+      const value = this.cells[i][ix];
+      const id = this.ref_index[i];
+      times.set(id, +value);
+    }
+    return times;
+  }
+
+  getAvailableIds() {
+    return this.ref_index.filter(a => a);
+  }
+}
+
+function fitLayer(name) {
+  projection.scale(1).translate([0, 0]);
+  const b = get_bbox_layer_path(name);
+  const s = 0.70 / Math.max((b[1][0] - b[0][0]) / width, (b[1][1] - b[0][1]) / height);
+  const t = [(width - s * (b[1][0] + b[0][0])) / 2, (height - s * (b[1][1] + b[0][1])) / 2];
+  projection.scale(s).translate(t);
+  svg.selectAll('path').attr('d', path);
+}
+
+function get_bbox_layer_path(name) {
+  const bbox_layer = [[Infinity, Infinity], [-Infinity, -Infinity]];
+  svg.select(`#${name}`)
+    .selectAll('path')
+    .each((d) => {
+      const bbox_path = path.bounds(d.geometry);
+      bbox_layer[0][0] = bbox_path[0][0] < bbox_layer[0][0] ? bbox_path[0][0] : bbox_layer[0][0];
+      bbox_layer[0][1] = bbox_path[0][1] < bbox_layer[0][1] ? bbox_path[0][1] : bbox_layer[0][1];
+      bbox_layer[1][0] = bbox_path[1][0] > bbox_layer[1][0] ? bbox_path[1][0] : bbox_layer[1][0];
+      bbox_layer[1][1] = bbox_path[1][1] > bbox_layer[1][1] ? bbox_path[1][1] : bbox_layer[1][1];
+    });
+  return bbox_layer;
+}
+
+function populateSelect(available_ids) {
+  const select = d3.select('#comm');
+  available_ids.forEach(id => { select.append('option').attr('value', id).text(id); });
+}
+
+
+function distance(x1, y1, x2, y2) {
+  const a = x1 - x2;
+  const b = y1 - y2;
+  return sqrt(a * a + b * b);
+}
+
+function point_at(coords_line, normalized_dist) {
+  const a = coords_line[0];
+  const b = coords_line[1];
+  return [
+    (b[0] - a[0]) * normalized_dist + a[0],
+    (b[1] - a[1]) * normalized_dist + a[1],
+  ];
+};
+
+function getImageLayer(source_geojson, mat, my_comm, factor=1) {
+  const image_geojson = JSON.parse(JSON.stringify(source_geojson));
+  const times = mat.getTime(my_comm);
+  const my_feature = image_geojson.features.find(d => d.properties.INSEE_COM === my_comm);
+  const x1 = my_feature.geometry.coordinates[0];
+  const y1 = my_feature.geometry.coordinates[1];
+  image_geojson.features.forEach((ft) => {
+    ft.properties.time = times.get(ft.properties.INSEE_COM);
+    ft.properties.distance_eucl = distance(x1, y1, ft.geometry.coordinates[0], ft.geometry.coordinates[1]);
+    ft.properties.vitesse = ft.properties.distance_eucl / ft.properties.time;
+  });
+  const ref_vitesse = d3.median(image_geojson.features.map(d => d.properties.vitesse).filter(d => !isNaN(d)));
+
+  image_geojson.features.forEach((ft) => {
+    ft.properties.deplacement = ref_vitesse / ft.properties.vitesse;
+  });
+  image_geojson.features.forEach((ft) => {
+    if (ft.properties.INSEE_COM === my_comm) return;
+    const deplacement = 1 + (1 - ft.properties.deplacement) * factor;
+    const line = [[x1, y1], ft.geometry.coordinates];
+    const moved_pt = point_at(line, deplacement);
+    ft.geometry.coordinates = moved_pt;
+  });
+  return image_geojson;
+}
+
+</script>
