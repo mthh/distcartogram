@@ -10,11 +10,34 @@ body {
   display: flex;
 }
 
-input {
+.uservalue > input {
   width: 70px;
   margin-left: 10px;
   margin-right: 10px;
   float: right;
+}
+
+.uservalue > input[type="checkbox"] {
+  margin-left: 7.5px;
+  margin-right: 7.5px;
+  width: 15px;
+  float: left;
+}
+
+.uservalue > input[type="select"] {
+  width: auto;
+}
+
+.uservalue.opts {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+#pts > path.target {
+  fill: yellow;
+  fill-opacity: 1;
+  stroke-width: 1;
+  stroke-opacity: 1;
 }
 
 select {
@@ -28,7 +51,7 @@ select {
   height: 18px;
 }
 
-.uservalue > span {
+.uservalue > span, .uservalue.opts > span {
   margin-left: 5px;
   margin-right: 5px;
   float: left;
@@ -46,27 +69,76 @@ select {
   overflow-wrap: break-word;
 }
 
+.grid.visible > path {
+  fill: none;
+  stroke: darkgreen;
+  stroke-opacity: 1;
+}
+
+.grid.invisible > path {
+  fill: none;
+  stroke: none;
+  stroke-opacity: 0;
+}
+
 </style>
 <svg width="600" height="660"></svg>
-<div style="width:300px;">
+<div style="width:450px;">
 <p class="uservalue">
   <span>Commune de départ</span><select id="comm"></select><br> </p>
 <p class="uservalue">
-  <span>Facteur de déplacement</span><input type="number" id="factor" step="any" value="1.1"></input><br>
-</p>
+  <input type="checkbox" id="display_grid" checked/><label for="checkbox">Afficher la grille</label></p>
 <p class="uservalue">
-  <span>Précision de la grille</span><input type="number" id="precision" step="any" value="1.1" max="3" min="0"></input><br>
+  <input type="checkbox" id="advanced_opts"/><label for="advanced_opts">Options avancées</label></p>
+<p class="uservalue opts" style="display:none;">
+  <span>Facteur de déplacement</span><input type="number" id="factor" step="any" value="1"></input><br>
+</p>
+<p class="uservalue opts" style="display:none;">
+  <span>Précision de la grille</span><input type="number" id="precision" step="any" value="1" max="3" min="0"></input><br>
 </p>
 <p><button id="transform">Transform</button><button id="reset">Reset</button></p>
 </div>
 <script src="//d3js.org/d3.v4.min.js"></script>
 <script src="distcarto.js"></script>
 <script>
-d3.select('#reset').on('click', () => { undo(); });
-d3.select('#transform').on('click', redraw);
+d3.select('#factor').property('value', 1);
+d3.select('#precision').property('value', 1);
+d3.select('#advanced_opts').property('checked', false);
+d3.select('#display_grid').property('checked', true);
+d3.select('#reset').on('click', () => {
+  transformed = false;
+  undo();
+  updateOriginGrid(+document.getElementById('precision').value)
+});
+d3.select('#transform').on('click', () => {
+  transformed = true;
+  redraw();
+});
 d3.select('#factor').on('change', redraw);
-d3.select('#precision').on('change', redraw);
-d3.select('#comm').on('change', redraw);
+d3.select('#precision').on('change', function () {
+  if (transformed) redraw();
+  else {
+    updateOriginGrid(this.value);
+  }
+});
+d3.select('#comm').on('change', function () {
+  changeMarkerPos(this.value);
+  redraw();
+});
+d3.select('#display_grid').on('change', function () {
+  if (this.checked) {
+    layers.select('.grid').attr('class', 'layer grid visible');
+  } else {
+    layers.select('.grid').attr('class', 'layer grid invisible');
+  }
+});
+d3.select('#advanced_opts').on('change', function () {
+  if (this.checked) {
+    d3.selectAll('.opts').style('display', 'inherit');
+  } else {
+    d3.selectAll('.opts').style('display', 'none');
+  }
+});
 function redraw() {
   const my_comm = document.getElementById('comm').value;
   const precision = +document.getElementById('precision').value;
@@ -103,6 +175,7 @@ svg.call(d3.zoom()
   .translateExtent([[0, 0], [width, height]])
   .on('zoom', map_zoomed));
 
+let transformed = false;
 let background, source, image, mat;
 let projection;
 let path;
@@ -110,9 +183,6 @@ let _do;
 let undo;
 
 d3.queue(3)
-  // .defer(d3.json, 'com46.geojson')
-  // .defer(d3.json, 'source.geojson')
-  // .defer(d3.request, 'mat46.csv')
   .defer(d3.json, 'depfr_simple.geojson')
   .defer(d3.json, 'source_pref.geojson')
   .defer(d3.request, 'mat.csv')
@@ -120,7 +190,8 @@ d3.queue(3)
     if (error) throw error;
     [background, source, raw_mat] = result;
     mat = new Mat(raw_mat.response);
-    populateSelect(mat.getAvailableIds());
+    const available_ids = mat.getAvailableIds();
+    populateSelect(available_ids);
     getImageLayer(source, mat, '46042');
     projection = d3.geoIdentity()
       .fitExtent([[0, 0], [width, height]], background.features)
@@ -143,24 +214,27 @@ d3.queue(3)
       .attr('id', 'pts')
       .attr('class', 'layer pts')
       .attr('fill', 'green')
-      .attr('fill-opacity', 0.2)
+      .attr('fill-opacity', 0.3)
       .attr('stroke', 'black')
       .attr('stroke-opacity', 0.2)
       .selectAll('path')
       .data(source.features)
       .enter()
       .append('path')
+      .attr('id', d => `ft_${d.properties.INSEE_COM}`)
       .attr('d', path);
 
     fitLayer('background');
+    changeMarkerPos(available_ids[0]);
+    updateOriginGrid(1);
     _do = (my_comm='46042', precision=1, factor=1) => {
-      const image2 = getImageLayer(source, mat, my_comm, factor);
+      image_transformed = getImageLayer(source, mat, my_comm, factor);
       const source_pts = [];
       const image_pts = [];
       const nb_ft = source.features.length;
       for (let i = 0; i < nb_ft; i++) {
         source_pts.push(source.features[i].geometry.coordinates);
-        image_pts.push(image2.features[i].geometry.coordinates);
+        image_pts.push(image_transformed.features[i].geometry.coordinates);
       }
       const c = new DistCarto(source_pts, image_pts, background, precision);
       const result = c.transform_background();
@@ -176,7 +250,7 @@ d3.queue(3)
           .append('path')
           .attr('fill', 'none')
           .attr('stroke', 'darkgreen')
-          .attr('stroke-opacity', '1')
+          .attr('stroke-opacity', '0.4')
           .attr('d', path);
       } else {
         let sel = layers.select('#grid')
@@ -187,7 +261,7 @@ d3.queue(3)
           .append('path')
           .attr('fill', 'none')
           .attr('stroke', 'darkgreen')
-          .attr('stroke-opacity', '1')
+          .attr('stroke-opacity', '0.4')
           .attr('d', path);
         sel
           .transition()
@@ -202,7 +276,7 @@ d3.queue(3)
         .attr('d', path);
 
        layers.selectAll('#pts > path')
-         .data(image2.features)
+         .data(image_transformed.features)
          .transition()
          .duration(225)
          .attr('fill', 'red')
@@ -222,8 +296,6 @@ d3.queue(3)
         .transition()
         .duration(225)
         .attr('d', path);
-
-      layers.select('#grid').remove();
     };
   });
 
@@ -274,7 +346,8 @@ function get_bbox_layer_path(name) {
 
 function populateSelect(available_ids) {
   const select = d3.select('#comm');
-  available_ids.forEach(id => { select.append('option').attr('value', id).text(id); });
+  const table = new Map(source.features.map(ft => [ft.properties.INSEE_COM, ft.properties.NOM_COM]));
+  available_ids.forEach(id => { select.append('option').attr('value', id).text(table.get(id)); });
 }
 
 
@@ -317,6 +390,52 @@ function getImageLayer(source_geojson, mat, my_comm, factor=1) {
     ft.geometry.coordinates = moved_pt;
   });
   return image_geojson;
+}
+
+function changeMarkerPos(comm_id) {
+  layers.selectAll('#pts > path').attr('class', '');
+  layers.select(`#pts > path#ft_${comm_id}`).attr('class', 'target');
+}
+
+function updateOriginGrid(precision) {
+  const source_pts = [];
+  const image_pts = [];
+  const nb_ft = source.features.length;
+  for (let i = 0; i < nb_ft; i++) {
+    source_pts.push(source.features[i].geometry.coordinates);
+  }
+  const c = new DistCarto(source_pts, source_pts, background, precision);
+  const grid = c.get_source_grid();
+
+  if (!layers.select('#grid').node()) {
+    layers.insert('g')
+      .attr('id', 'grid')
+      .attr('class', 'layer grid')
+      .selectAll('path')
+      .data(grid.features)
+      .enter()
+      .append('path')
+      .attr('fill', 'none')
+      .attr('stroke', 'darkgreen')
+      .attr('stroke-opacity', '0.4')
+      .attr('d', path);
+  } else {
+    let sel = layers.select('#grid')
+      .selectAll('path')
+      .data(grid.features);
+
+    sel.enter()
+      .append('path')
+      .attr('fill', 'none')
+      .attr('stroke', 'darkgreen')
+      .attr('stroke-opacity', '0.4')
+      .attr('d', path);
+    sel
+      .transition()
+      .duration(225)
+      .attr('d', path);
+    sel.exit().remove();
+  }
 }
 
 </script>
