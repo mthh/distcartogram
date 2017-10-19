@@ -170,10 +170,12 @@ class Grid {
         const src_pt = this.points[ix];
         const adj_pt = img_points[ix];
         const adj_nodes = this.get_adj_nodes(src_pt);
-        const smoothed_nodes = [];
-        for (let i = 0; i < adj_nodes.length; i++) {
-          smoothed_nodes.push(this.get_smoothed(adj_nodes[i].i, adj_nodes[i].j));
-        }
+        const smoothed_nodes = [
+          this.get_smoothed(adj_nodes[0].i, adj_nodes[0].j),
+          this.get_smoothed(adj_nodes[1].i, adj_nodes[1].j),
+          this.get_smoothed(adj_nodes[2].i, adj_nodes[2].j),
+          this.get_smoothed(adj_nodes[3].i, adj_nodes[3].j)
+        ];
 
         ux1 = src_pt.x - adj_nodes[0].source.x;
         ux2 = resolution - ux1;
@@ -198,12 +200,12 @@ class Grid {
           sQy += qy[i];
         }
 
-        hx1 = ux1/resolution * (adj_nodes[1].interp.x-adj_nodes[0].interp.x) + adj_nodes[0].interp.x;
-        hx2 = ux1/resolution * (adj_nodes[3].interp.x-adj_nodes[2].interp.x) + adj_nodes[2].interp.x;
-        HX = vy1/resolution * (hx1 - hx2) + hx2;
-        hy1 = ux1/resolution * (adj_nodes[1].interp.y-adj_nodes[0].interp.y) + adj_nodes[0].interp.y;
-        hy2 = ux1/resolution * (adj_nodes[3].interp.y-adj_nodes[2].interp.y) + adj_nodes[2].interp.y;
-        HY = vy1/resolution * (hy1 - hy2) + hy2;
+        hx1 = ux1 / resolution * (adj_nodes[1].interp.x-adj_nodes[0].interp.x) + adj_nodes[0].interp.x;
+        hx2 = ux1 / resolution * (adj_nodes[3].interp.x-adj_nodes[2].interp.x) + adj_nodes[2].interp.x;
+        HX = vy1 / resolution * (hx1 - hx2) + hx2;
+        hy1 = ux1 / resolution * (adj_nodes[1].interp.y-adj_nodes[0].interp.y) + adj_nodes[0].interp.y;
+        hy2 = ux1 / resolution * (adj_nodes[3].interp.y-adj_nodes[2].interp.y) + adj_nodes[2].interp.y;
+        HY = vy1 / resolution * (hy1 - hy2) + hy2;
 
         deltaX = adj_pt.x - HX;
         deltaY = adj_pt.y - HY;
@@ -211,9 +213,9 @@ class Grid {
         dy = deltaY * resolution * resolution;
 
         for (let i = 0; i < 4; i++) {
-          adjX = u * v * ((dx - qx[i] + sQx)*w[i] + deltaZx[i]*(w[i] * w[i] - sW)) / adj_nodes[i].weight;
+          adjX = u * v * ((dx - qx[i] + sQx) * w[i] + deltaZx[i] * (w[i] * w[i] - sW)) / adj_nodes[i].weight;
           adj_nodes[i].interp.x += adjX;
-          adjY = u*v * ((dy-qy[i]+sQy)*w[i] + deltaZy[i]*(w[i]*w[i] - sW)) / adj_nodes[i].weight;
+          adjY = u * v * ((dy - qy[i] + sQy) * w[i] + deltaZy[i] * (w[i] * w[i] - sW)) / adj_nodes[i].weight;
           adj_nodes[i].interp.y += adjY;
         }
       }
@@ -389,5 +391,37 @@ class DistCarto {
       }
     });
     return this.background;
+  }
+
+  _get_grid(type='source') {
+    const features = [];
+    for (let i = 0; i < this.grid.height - 1; i++) {
+      for (let j = 0; j < this.grid.width - 1; j++) {
+
+        features.push({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[
+              this.grid.get_node(i, j)[type].to_xy(),
+              this.grid.get_node(i + 1, j)[type].to_xy(),
+              this.grid.get_node(i + 1, j + 1)[type].to_xy(),
+              this.grid.get_node(i, j + 1)[type].to_xy(),
+              this.grid.get_node(i, j)[type].to_xy(),
+            ]],
+          },
+        });
+      }
+    }
+    return { type: 'FeatureCollection', features: features };
+  }
+
+  get_source_grid() {
+    return this._get_grid('source');
+  }
+
+  get_interp_grid() {
+    return this._get_grid('interp');
   }
 }

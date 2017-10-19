@@ -47,21 +47,20 @@ select {
 }
 
 </style>
-<svg width="700" height="760"></svg>
+<svg width="600" height="660"></svg>
 <div style="width:300px;">
 <p class="uservalue">
   <span>Commune</span><select id="comm"></select><br> </p>
 <p class="uservalue">
-  <span>Facteur de déplacement</span><input type="number" id="factor" value="1"></input><br>
+  <span>Facteur de déplacement</span><input type="number" id="factor" step="any" value="1.1"></input><br>
 </p>
 <p class="uservalue">
-  <span>Précision</span><input type="number" id="precision" value="1" max="3" min="0"></input><br>
+  <span>Précision</span><input type="number" id="precision" step="any" value="1.1" max="3" min="0"></input><br>
 </p>
 <p><button id="transform">Transform</button><button id="reset">Reset</button></p>
 </div>
 <script src="//d3js.org/d3.v4.min.js"></script>
 <script src="distcarto.js"></script>
-<script src="//d3js.org/topojson.v3.min.js"></script>
 <script>
 d3.select('#reset').on('click', () => { undo(); });
 d3.select('#transform').on('click', redraw);
@@ -114,7 +113,7 @@ d3.queue(3)
   // .defer(d3.json, 'com46.geojson')
   // .defer(d3.json, 'source.geojson')
   // .defer(d3.request, 'mat46.csv')
-  .defer(d3.json, 'depfr.geojson')
+  .defer(d3.json, 'depfr_simple.geojson')
   .defer(d3.json, 'source_pref.geojson')
   .defer(d3.request, 'mat.csv')
   .awaitAll((error, result) => {
@@ -146,7 +145,7 @@ d3.queue(3)
       .attr('fill', 'green')
       .attr('fill-opacity', 0.2)
       .attr('stroke', 'black')
-      .attr('sroke-opacity', 0.2)
+      .attr('stroke-opacity', 0.2)
       .selectAll('path')
       .data(source.features)
       .enter()
@@ -165,33 +164,66 @@ d3.queue(3)
       }
       const c = new DistCarto(source_pts, image_pts, background, precision);
       const result = c.transform_background();
+      const transform_grid = c.get_interp_grid();
+
+      if (!layers.select('#grid').node()) {
+        layers.insert('g')
+          .attr('id', 'grid')
+          .attr('class', 'layer grid')
+          .selectAll('path')
+          .data(transform_grid.features)
+          .enter()
+          .append('path')
+          .attr('fill', 'none')
+          .attr('stroke', 'darkgreen')
+          .attr('stroke-opacity', '1')
+          .attr('d', path);
+      } else {
+        let sel = layers.select('#grid')
+          .selectAll('path')
+          .data(transform_grid.features);
+
+        sel.enter()
+          .append('path')
+          .attr('fill', 'none')
+          .attr('stroke', 'darkgreen')
+          .attr('stroke-opacity', '1')
+          .attr('d', path);
+        sel
+          .transition()
+          .duration(225)
+          .attr('d', path);
+        sel.exit().remove();
+      }
       layers.selectAll('#background > path')
         .data(result.features)
         .transition()
-        .duration(500)
-        .attr("d", path);
+        .duration(225)
+        .attr('d', path);
 
        layers.selectAll('#pts > path')
          .data(image2.features)
          .transition()
-         .duration(500)
+         .duration(225)
          .attr('fill', 'red')
-         .attr("d", path);
+         .attr('d', path);
+
     };
     undo = () => {
       layers.selectAll('#pts > path')
         .data(source.features)
         .transition()
-        .duration(500)
+        .duration(225)
         .attr('fill', 'green')
-        .attr("d", path);
+        .attr('d', path);
 
       layers.selectAll('#background > path')
         .data(background.features)
         .transition()
-        .duration(500)
-        .attr("d", path);
+        .duration(225)
+        .attr('d', path);
 
+      layers.select('#grid').remove();
     };
   });
 
