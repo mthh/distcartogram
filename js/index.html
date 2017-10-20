@@ -24,8 +24,11 @@ body {
   float: left;
 }
 
-.uservalue > input[type="select"] {
+.uservalue > select {
   width: auto;
+  margin-left: 10px;
+  margin-right: 10px;
+  float: right;
 }
 
 .uservalue.opts {
@@ -38,13 +41,6 @@ body {
   fill-opacity: 1;
   stroke-width: 1;
   stroke-opacity: 1;
-}
-
-select {
-  width: 90px;
-  margin-left: 10px;
-  margin-right: 10px;
-  float: right;
 }
 
 .uservalue {
@@ -110,10 +106,7 @@ d3.select('#reset').on('click', () => {
   undo();
   updateOriginGrid(+document.getElementById('precision').value)
 });
-d3.select('#transform').on('click', () => {
-  transformed = true;
-  redraw();
-});
+d3.select('#transform').on('click', redraw);
 d3.select('#factor').on('change', redraw);
 d3.select('#precision').on('change', function () {
   if (transformed) redraw();
@@ -140,6 +133,7 @@ d3.select('#advanced_opts').on('change', function () {
   }
 });
 function redraw() {
+  transformed = true;
   const my_comm = document.getElementById('comm').value;
   const precision = +document.getElementById('precision').value;
   const factor = +document.getElementById('factor').value;
