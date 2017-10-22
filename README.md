@@ -1,27 +1,33 @@
 ## DistCartogram
+**Work still in progress.**
 
 *Distance cartogram* from 2 sets of related points: source points and image points.
 Deformations to fit image points and source points are calculated using Waldo Tobler's bidimensional regression.
+Directly adapted from [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy) software and ported to Python and JS.
 
-#### Usage / example:
+#### Online example (JS):
+[mthh.github.io/distcartogram/js](https://mthh.github.io/distcartogram/js)
+
+
+#### Usage / example (Python):
 Load the background shape to be deformed:
 ```
 import geopandas as gpd
-background = gpd.read_file('background.shp')
+background = gpd.read_file('data/depfr_simple.geojson')
 background.plot()
 ```
 ![background_plot](https://raw.githubusercontent.com/mthh/distcartogram/master/misc/background.png)
 
 Load the source and image points layers:
 ```
-source = gpd.read_file('source.shp')
-image = gpd.read_file('image.shp')
+source = gpd.read_file('data/source_pref.geojson')
+image = gpd.read_file('data/image_pref.geojson')
 ```
 
-Calculate the cartogram:
+Compute the cartogram:
 ```
 from distcartogram import DistCarto
-c = DistCarto(source, 'id', image, 'FID', background, 2)
+c = DistCarto(source, 'INSEE_COM', image, 'id', background, 2)
 result = c.transform_background()
 result.plot()
 ```
@@ -31,5 +37,5 @@ result.plot()
 #### Credits - License:
 
 Code is a direct adaptation of [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy)([Sourceforge](https://sourceforge.net/p/jdarcy/wiki/Home/)) software (G. Vuidel and C. Cauvin - released under GPLv3).  
-    
+
 Motivated by the wish to see if there is a possible interest or difficulty to integrate this method in another environment than Darcy, such as [Magrit](https://github.com/riatelab/magrit) or a qgis plugin.

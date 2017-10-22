@@ -177,9 +177,9 @@ let _do;
 let undo;
 
 d3.queue(3)
-  .defer(d3.json, 'depfr_simple.geojson')
-  .defer(d3.json, 'source_pref.geojson')
-  .defer(d3.request, 'mat.csv')
+  .defer(d3.json, '../data/depfr_simple.geojson')
+  .defer(d3.json, '../data/source_pref.geojson')
+  .defer(d3.request, '../data/mat.csv')
   .awaitAll((error, result) => {
     if (error) throw error;
     [background, source, raw_mat] = result;
@@ -378,7 +378,7 @@ function getImageLayer(source_geojson, mat, my_comm, factor=1) {
   });
   image_geojson.features.forEach((ft) => {
     if (ft.properties.INSEE_COM === my_comm) return;
-    const deplacement = 1 + (1 - ft.properties.deplacement) * factor;
+    const deplacement = 1 + (ft.properties.deplacement - 1) * factor;
     const line = [[x1, y1], ft.geometry.coordinates];
     const moved_pt = point_at(line, deplacement);
     ft.geometry.coordinates = moved_pt;
