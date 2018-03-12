@@ -2,20 +2,25 @@
 # -*- coding: utf-8 -*-
 from math import sqrt, radians, cos, sin, asin, ceil, pow as m_pow
 from shapely.ops import transform
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
 from geopandas import GeoDataFrame
+import numpy as np
+
 
 class Node:
     __slots__ = ['weight', 'i', 'j', 'source', 'interp']
-    def __init__(self, i, j, src = None):
+
+    def __init__(self, i, j, src=None):
         self.weight = 0
         self.i = i
         self.j = j
         self.source = src
         self.interp = None
 
+
 class Point:
     __slots__ = ['x', 'y']
+
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -31,17 +36,20 @@ class Point:
         b = self.y - other.y
         return sqrt(a * a + b * b)
 
+
 def haversine(lon1, lat1, lon2, lat2):
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-    dlon = lon2 - lon1 
-    dlat = lat2 - lat1 
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a)) 
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * asin(sqrt(a))
     r = 6371
     return c * r
 
+
 class Rectangle2D:
     __slots__ = ['height', 'width', 'x', 'y']
+
     def __init__(self, height, width, x, y):
         self.height = height
         self.width = width
@@ -60,16 +68,21 @@ class Rectangle2D:
         if ty > self.height:
             self.height = ty
 
+
 def getBoundingRect(points):
     minx = float('inf')
     miny = float('inf')
     maxx = -float('inf')
     maxy = -float('inf')
     for p in points:
-        if p.x > maxx: maxx = p.x
-        if p.x < minx: minx = p.x
-        if p.y > maxy: maxy = p.y
-        if p.y < miny: miny = p.y
+        if p.x > maxx:
+            maxx = p.x
+        if p.x < minx:
+            minx = p.x
+        if p.y > maxy:
+            maxy = p.y
+        if p.y < miny:
+            miny = p.y
     return (minx, miny, maxx, maxy)
 
 
@@ -118,7 +131,7 @@ class Grid:
 
     def get_i(self, p):
         return int((self.max_y - p.y) / self.resolution)
-    
+
     def get_j(self, p):
         return int((p.x - self.min_x) / self.resolution)
 
@@ -187,9 +200,9 @@ class Grid:
         else:
             diff[2] = (ny1.interp.x - ny2.interp.x) / (2 * resolution)
             diff[3] = (ny1.interp.y - ny2.interp.y) / (2 * resolution)
-    
+
         return diff
-    
+
     def interpolate(self, img_points, nb_iter):
         for n in self.nodes:
             n.interp = Point(n.source.x, n.source.y)
@@ -210,7 +223,8 @@ class Grid:
         for k in range(nb_iter):
             for (src_pt, adj_pt) in zip(self.points, img_points):
                 adj_nodes = self.get_adj_nodes(src_pt)
-                smoothed_nodes = [self.get_smoothed(a.i, a.j) for a in adj_nodes]
+                smoothed_nodes = [
+                    self.get_smoothed(a.i, a.j) for a in adj_nodes]
 
                 ux1 = src_pt.x - adj_nodes[0].source.x
                 ux2 = resolution - ux1
@@ -233,11 +247,19 @@ class Grid:
                     sQx += qx[i]
                     sQy += qy[i]
 
-                hx1 = ux1/resolution * (adj_nodes[1].interp.x-adj_nodes[0].interp.x) + adj_nodes[0].interp.x
-                hx2 = ux1/resolution * (adj_nodes[3].interp.x-adj_nodes[2].interp.x) + adj_nodes[2].interp.x
+                hx1 = ux1/resolution * (
+                    adj_nodes[1].interp.x-adj_nodes[0].interp.x
+                    ) + adj_nodes[0].interp.x
+                hx2 = ux1/resolution * (
+                    adj_nodes[3].interp.x-adj_nodes[2].interp.x
+                    ) + adj_nodes[2].interp.x
                 HX = vy1/resolution * (hx1 - hx2) + hx2
-                hy1 = ux1/resolution * (adj_nodes[1].interp.y-adj_nodes[0].interp.y) + adj_nodes[0].interp.y
-                hy2 = ux1/resolution * (adj_nodes[3].interp.y-adj_nodes[2].interp.y) + adj_nodes[2].interp.y
+                hy1 = ux1/resolution * (
+                    adj_nodes[1].interp.y-adj_nodes[0].interp.y
+                    ) + adj_nodes[0].interp.y
+                hy2 = ux1/resolution * (
+                    adj_nodes[3].interp.y-adj_nodes[2].interp.y
+                    ) + adj_nodes[2].interp.y
                 HY = vy1/resolution * (hy1 - hy2) + hy2
 
                 deltaX = adj_pt.x - HX
@@ -246,11 +268,15 @@ class Grid:
                 dy = deltaY * resolution * resolution
 
                 for i in range(4):
-                    adjX = u*v * ((dx-qx[i]+sQx)*w[i] + deltaZx[i]*(w[i]*w[i] - sW)) / adj_nodes[i].weight
+                    adjX = u * v * (
+                        (dx-qx[i]+sQx)*w[i] + deltaZx[i]*(w[i]*w[i] - sW)
+                        ) / adj_nodes[i].weight
                     adj_nodes[i].interp.x += adjX
-                    adjY = u*v * ((dy-qy[i]+sQy)*w[i] + deltaZy[i]*(w[i]*w[i] - sW)) / adj_nodes[i].weight
+                    adjY = u * v * (
+                        (dy-qy[i]+sQy)*w[i] + deltaZy[i]*(w[i]*w[i] - sW)
+                        ) / adj_nodes[i].weight
                     adj_nodes[i].interp.y += adjY
-            
+
             p_tmp = Point(0, 0)
             for l in range(width * height):
                 delta = 0
@@ -263,10 +289,11 @@ class Grid:
                             _p = self.get_smoothed(i, j)
                             n.interp.x = _p.x
                             n.interp.y = _p.y
-                            delta = max([delta, p_tmp.distance(n.interp) / rect_dim])
+                            delta = max(
+                                [delta, p_tmp.distance(n.interp) / rect_dim])
                 if l > 5 and sqrt(delta) < 0.0001:
                     break
-                
+
         self.interp_points = [
             self.get_interp_point(self.points[i])
             for i in range(len(img_points))
@@ -288,21 +315,21 @@ class Grid:
             _i = get_node(i-2, j).interp
             _j = get_node(i+2, j).interp
             k = get_node(i, j-2).interp
-            l = get_node(i, j+2).interp
+            _l = get_node(i, j+2).interp
             return Point(
-                (8 * 
+                (8 *
                  (a.x + b.x + c.x + d.x)
-                 -2 * (e.x + f.x + g.x + h.x)
-                 - (_i.x + _j.x + k.x + l.x)) / 20, 
+                 - 2 * (e.x + f.x + g.x + h.x)
+                 - (_i.x + _j.x + k.x + _l.x)) / 20,
                 (8 *
                  (a.y + b.y + c.y + d.y)
-                 -2 * (e.y + f.y + g.y + h.y)
-                 - (_i.y + _j.y + k.y + l.y)) / 20
+                 - 2 * (e.y + f.y + g.y + h.y)
+                 - (_i.y + _j.y + k.y + _l.y)) / 20
                     )
-        
+
         nb = sx = sy = 0
         if i > 0:
-            n = get_node(i-1, j).interp
+            n = get_node(i - 1, j).interp
             sx += n.x
             sy += n.y
             nb += 1
@@ -315,15 +342,15 @@ class Grid:
             nb += 1
         else:
             sx -= self.scaleX * self.resolution
-        
+
         if i < self.height - 1:
-            n = get_node(i+1, j).interp
+            n = get_node(i + 1, j).interp
             sx += n.x
             sy += n.y
             nb += 1
         else:
             sy -= self.scaleY * self.resolution
-        
+
         if j < self.width - 1:
             n = get_node(i, j + 1).interp
             sx += n.x
@@ -331,7 +358,7 @@ class Grid:
             nb += 1
         else:
             sx += self.scaleX * self.resolution
-        
+
         return Point(sx/nb, sy/nb)
 
 
@@ -356,7 +383,7 @@ class DistCarto:
         return int(coef_iter * sqrt(len(self.source)))
 
     def _get_grid(self, _type='source'):
-        if not _type in ('source', 'interp'):
+        if _type not in ('source', 'interp'):
             raise ValueError('Invalid grid type requested')
         grid = self.g
         polys = []
@@ -383,3 +410,47 @@ class DistCarto:
             transform(self.g._interp_point, geom) for geom in b.geometry]
         return b
 
+
+def extrapole_line(p1, p2, ratio):
+    return LineString([
+        p1,
+        (p1[0] + ratio, (p2[0] - p1[0]), p1[1] + ratio * (p2[1] - p1[1]))
+    ])
+
+
+def getImageLayer(self, layer, id_my_feature, mat, col_idx=None):
+    if col_idx:
+        layer.set_index(col_idx, inplace=True)
+    extract = mat[['Unamed: 0', id_my_feature]]
+    extract.columns = ['id', 'time']
+    extract.loc[:, 'id'] = extract['id'].apply(lambda x: str(x))
+    extract.set_index('id', inplace=True)
+    layer = layer.join(extract)
+    origin_feature = layer.loc[id_my_feature]
+    origin_geom = origin_feature.geometry
+    layer['dist_euclidienne'] = layer.geometry.apply(
+        lambda x: x.distance(origin_geom))
+    layer['vitesse'] = layer.dist_euclidienne / layer.time
+    ref_vitesse = np.nanmedian(layer['vitesse'])
+    layer['deplacement'] = layer['vitesse'].apply(lambda x: ref_vitesse / x)
+    layer['deplacement'].replace(np.nan, 1, inplace=True)
+    x1 = origin_geom.coords.xy[0][0]
+    y1 = origin_geom.coords.xy[1][0]
+    p1 = (x1, y1)
+    ids, geoms = [], []
+    for d in layer[
+            ['geometry', 'deplacement', 'dist_euclidienne']].itertuples():
+        deplacement = d.deplacement
+        if deplacement <= 1:
+            li = LineString([origin_geom, d.geometry])
+            p = li.interpolate(deplacement, normalized=True)
+        else:
+            p2 = (d.geometry.coords.xy[0][0], d.geometry.coords.xy[1][0])
+            li = extrapole_line(p1, p2, 10)
+            p = li.interpolate(deplacement * d.dist_euclidienne)
+        ids.append(d.Index)
+        geoms.append(p)
+    image = GeoDataFrame(ids, geometry=geoms)
+    image.crs = layer.crs
+    image.columns = ['id', 'geometry']
+    return image
