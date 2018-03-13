@@ -5,6 +5,8 @@
 Deformations to fit image points and source points are calculated using Waldo Tobler's bidimensional regression.
 Directly adapted from [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy) software and ported to Python and JS.
 
+
+
 #### Online example (JS):
 [mthh.github.io/distcartogram/js](https://mthh.github.io/distcartogram/js)
 
@@ -18,10 +20,15 @@ background.plot()
 ```
 ![background_plot](https://raw.githubusercontent.com/mthh/distcartogram/master/misc/background.png)
 
-Load the source and image points layers:
+Load the source points layer and the a matrix of time between these points:
 ```
 source = gpd.read_file('data/source_pref.geojson')
-image = gpd.read_file('data/image_pref.geojson')
+mat = pd.read_csv('data/mat.csv')
+```
+
+Create the image points layer by approaching them or moving them away from a reference point:
+```
+image = getImageLayer(source, '94028', mat, 'INSEE_COM')
 ```
 
 Compute the cartogram:

@@ -112,11 +112,12 @@ class Grid:
         self.min_x = rect[0]
         self.max_y = rect[3]
         self.nodes = []
+        resolution = self.resolution
         for i in range(self.height):
             for j in range(self.width):
                 self.nodes.append(Node(i, j, Point(
-                        self.min_x + j * self.resolution,
-                        self.max_y - i * self.resolution
+                        self.min_x + j * resolution,
+                        self.max_y - i * resolution
                         )))
 
         for p in points:
@@ -216,15 +217,18 @@ class Grid:
 
         self.scaleX = rect_adj.width / rect.width
         self.scaleY = rect_adj.height / rect.height
+
         resolution = self.resolution
         width = self.width
         height = self.height
         rect_dim = self.rect_width * self.rect_height
+        get_smoothed = self.get_smoothed
+        get_adj_nodes = self.get_adj_nodes
+
         for k in range(nb_iter):
             for (src_pt, adj_pt) in zip(self.points, img_points):
-                adj_nodes = self.get_adj_nodes(src_pt)
-                smoothed_nodes = [
-                    self.get_smoothed(a.i, a.j) for a in adj_nodes]
+                adj_nodes = get_adj_nodes(src_pt)
+                smoothed_nodes = [get_smoothed(a.i, a.j) for a in adj_nodes]
 
                 ux1 = src_pt.x - adj_nodes[0].source.x
                 ux2 = resolution - ux1
@@ -376,6 +380,8 @@ class DistCarto:
 
         self.background = background
         rect = background.total_bounds
+        if rect.tolist:
+            rect = rect.tolist()
         self.g = Grid(self.source, precision, rect)
         self.g.interpolate(self.image, self._get_inter_nb_iter(4))
 
@@ -414,26 +420,32 @@ class DistCarto:
 def extrapole_line(p1, p2, ratio):
     return LineString([
         p1,
-        (p1[0] + ratio, (p2[0] - p1[0]), p1[1] + ratio * (p2[1] - p1[1]))
+        (p1[0] + ratio * (p2[0] - p1[0]), p1[1] + ratio * (p2[1] - p1[1]))
     ])
 
 
-def getImageLayer(self, layer, id_my_feature, mat, col_idx=None):
-    if col_idx:
-        layer.set_index(col_idx, inplace=True)
-    extract = mat[['Unamed: 0', id_my_feature]]
+def getImageLayer(source, id_my_feature, mat, col_idx=None):
+    reset_index = False
+    if col_idx and (not source.index.name or col_idx not in source.index.name):
+        if source.index.name:
+            reset_index = source.index.name
+        else:
+            reset_index = True
+        source.set_index(col_idx, inplace=True)
+    first_col = mat.columns[0]
+    extract = mat[[first_col, id_my_feature]][:]
     extract.columns = ['id', 'time']
     extract.loc[:, 'id'] = extract['id'].apply(lambda x: str(x))
     extract.set_index('id', inplace=True)
-    layer = layer.join(extract)
+    layer = source.join(extract)
     origin_feature = layer.loc[id_my_feature]
     origin_geom = origin_feature.geometry
-    layer['dist_euclidienne'] = layer.geometry.apply(
+    layer.loc[:, 'dist_euclidienne'] = layer.geometry.apply(
         lambda x: x.distance(origin_geom))
-    layer['vitesse'] = layer.dist_euclidienne / layer.time
+    layer.loc[:, 'vitesse'] = layer.dist_euclidienne / layer.time
     ref_vitesse = np.nanmedian(layer['vitesse'])
-    layer['deplacement'] = layer['vitesse'].apply(lambda x: ref_vitesse / x)
-    layer['deplacement'].replace(np.nan, 1, inplace=True)
+    layer.loc[:, 'deplacement'] = layer['vitesse'].apply(lambda x: ref_vitesse / x)
+    layer.loc[:, 'deplacement'].replace(np.nan, 1, inplace=True)
     x1 = origin_geom.coords.xy[0][0]
     y1 = origin_geom.coords.xy[1][0]
     p1 = (x1, y1)
@@ -442,7 +454,7 @@ def getImageLayer(self, layer, id_my_feature, mat, col_idx=None):
             ['geometry', 'deplacement', 'dist_euclidienne']].itertuples():
         deplacement = d.deplacement
         if deplacement <= 1:
-            li = LineString([origin_geom, d.geometry])
+            li = LineString([p1, d.geometry])
             p = li.interpolate(deplacement, normalized=True)
         else:
             p2 = (d.geometry.coords.xy[0][0], d.geometry.coords.xy[1][0])
@@ -450,7 +462,14 @@ def getImageLayer(self, layer, id_my_feature, mat, col_idx=None):
             p = li.interpolate(deplacement * d.dist_euclidienne)
         ids.append(d.Index)
         geoms.append(p)
+
+    if reset_index and not isinstance(reset_index, str):
+        source.reset_index(inplace=True)
+    elif isinstance(reset_index, str):
+        source.set_index(reset_index, drop=False, inplace=True)
+
     image = GeoDataFrame(ids, geometry=geoms)
     image.crs = layer.crs
     image.columns = ['id', 'geometry']
     return image
+
