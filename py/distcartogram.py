@@ -219,11 +219,10 @@ class Grid:
         self.scaleY = rect_adj.height / rect.height
 
         resolution = self.resolution
-        width = self.width
-        height = self.height
+        width, height = self.width, self.weight
         rect_dim = self.rect_width * self.rect_height
-        get_smoothed = self.get_smoothed
-        get_adj_nodes = self.get_adj_nodes
+        get_node = self.get_node
+        get_smoothed, get_adj_nodes = self.get_smoothed, self.get_adj_nodes
 
         for k in range(nb_iter):
             for (src_pt, adj_pt) in zip(self.points, img_points):
@@ -286,11 +285,11 @@ class Grid:
                 delta = 0
                 for i in range(height):
                     for j in range(width):
-                        n = self.get_node(i, j)
+                        n = get_node(i, j)
                         if n.weight == 0:
                             p_tmp.x = n.interp.x
                             p_tmp.y = n.interp.y
-                            _p = self.get_smoothed(i, j)
+                            _p = get_smoothed(i, j)
                             n.interp.x = _p.x
                             n.interp.y = _p.y
                             delta = max(
@@ -444,7 +443,8 @@ def getImageLayer(source, id_my_feature, mat, col_idx=None):
         lambda x: x.distance(origin_geom))
     layer.loc[:, 'vitesse'] = layer.dist_euclidienne / layer.time
     ref_vitesse = np.nanmedian(layer['vitesse'])
-    layer.loc[:, 'deplacement'] = layer['vitesse'].apply(lambda x: ref_vitesse / x)
+    layer.loc[:, 'deplacement'] = layer['vitesse'].apply(
+        lambda x: ref_vitesse / x)
     layer.loc[:, 'deplacement'].replace(np.nan, 1, inplace=True)
     x1 = origin_geom.coords.xy[0][0]
     y1 = origin_geom.coords.xy[1][0]
@@ -472,4 +472,3 @@ def getImageLayer(source, id_my_feature, mat, col_idx=None):
     image.crs = layer.crs
     image.columns = ['id', 'geometry']
     return image
-

@@ -161,6 +161,8 @@ class Grid {
     const width = this.width;
     const height = this.height;
     const rect_dim = this.rect_width * this.rect_height;
+    const get_smoothed = this.get_smoothed;
+
     let ux1, ux2, vy1, vy2, u, v, w, qx, qy, deltaZx, deltaZy, sQx, sQy, sW;
     let hx1, hx2, HX, hy1, hy2, HY;
     let dx, dy, deltaX, deltaY, adjX, adjY;
@@ -171,10 +173,10 @@ class Grid {
         const adj_pt = img_points[ix];
         const adj_nodes = this.get_adj_nodes(src_pt);
         const smoothed_nodes = [
-          this.get_smoothed(adj_nodes[0].i, adj_nodes[0].j),
-          this.get_smoothed(adj_nodes[1].i, adj_nodes[1].j),
-          this.get_smoothed(adj_nodes[2].i, adj_nodes[2].j),
-          this.get_smoothed(adj_nodes[3].i, adj_nodes[3].j)
+          get_smoothed(adj_nodes[0].i, adj_nodes[0].j),
+          get_smoothed(adj_nodes[1].i, adj_nodes[1].j),
+          get_smoothed(adj_nodes[2].i, adj_nodes[2].j),
+          get_smoothed(adj_nodes[3].i, adj_nodes[3].j)
         ];
 
         ux1 = src_pt.x - adj_nodes[0].source.x;
@@ -229,7 +231,7 @@ class Grid {
             if (n.weight === 0) {
               p_tmp.x = n.interp.x;
               p_tmp.y = n.interp.y;
-              _p = this.get_smoothed(i, j);
+              _p = get_smoothed(i, j);
               n.interp.x = _p.x;
               n.interp.y = _p.y;
               delta = max(delta, p_tmp.distance(n.interp) / rect_dim);

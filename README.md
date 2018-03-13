@@ -1,8 +1,9 @@
 ## DistCartogram
 **Work still in progress.**
 
-*Distance cartogram* from 2 sets of related points: source points and image points.
-Deformations to fit image points and source points are calculated using Waldo Tobler's bidimensional regression.
+*Distance cartogram* from a set of source points and time matrix between them.  
+Time matrix is used to create a layer of image points.  
+Deformations to fit image points and source points are calculated using Waldo Tobler's bidimensional regression.  
 Directly adapted from [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy) software and ported to Python and JS.
 
 
