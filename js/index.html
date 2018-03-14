@@ -3,11 +3,7 @@
 <style>
 html {
   font-family: Monospace;
-  font-size: 11px;
-}
-
-body {
-  display: flex;
+  font-size: 12px;
 }
 
 .uservalue > input {
@@ -71,30 +67,47 @@ body {
   stroke-opacity: 1;
 }
 
-.grid.invisible > path {
+.grid > path {
   fill: none;
   stroke: none;
   stroke-opacity: 0;
 }
 
 </style>
-<svg width="600" height="660"></svg>
-<div style="width:450px;">
-<p class="uservalue">
-  <span>Commune de départ</span><select id="comm"></select><br> </p>
-<p class="uservalue">
-  <input type="checkbox" id="display_grid" checked/><label for="checkbox">Afficher la grille</label></p>
-<p class="uservalue">
-  <input type="checkbox" id="advanced_opts"/><label for="advanced_opts">Options avancées</label></p>
-<p class="uservalue opts" style="display:none;">
-  <span>Facteur de déplacement</span><input type="number" id="factor" step="any" value="1"></input><br>
-</p>
-<p class="uservalue opts" style="display:none;">
-  <span>Précision de la grille</span><input type="number" id="precision" step="any" value="1" max="3" min="0"></input><br>
-</p>
-<p><button id="transform">Transform</button><button id="reset">Reset</button></p>
+<div style="text-align:center;">
+  <h2>distcartogram.js</h2>
+</div>
+<div style="display:flex;margin:auto;">
+  <div style="margin:auto;margin-right:10px;">
+    <svg width="650" height="720"></svg>
+  </div>
+  <div style="margin:auto;margin-left:10px">
+    <p>
+      <span>Déplacement des points :</span>
+    </p>
+    <p style="text-align:center;">
+      <span style="text-align:center;"><b><i>Temps de parcours par la route</i></b></span>
+    </p>
+    <p style="margin:auto;">
+      <span>Commune de départ :</span>
+    </p>
+    <p>
+      <select id="comm"></select></p>
+    <p class="uservalue">
+      <input type="checkbox" id="display_grid" checked/><label for="checkbox">Afficher la grille</label></p>
+    <p class="uservalue">
+      <input type="checkbox" id="advanced_opts"/><label for="advanced_opts">Options avancées</label></p>
+    <p class="uservalue opts" style="display:none;">
+      <span>Facteur de déplacement</span><input type="number" id="factor" step="any" value="1"></input><br>
+    </p>
+    <p class="uservalue opts" style="display:none;">
+      <span>Précision de la grille</span><input type="number" id="precision" step="any" value="1" max="3" min="0"></input><br>
+    </p>
+    <p><button id="transform">Transform</button><button id="reset">Reset</button></p>
+  </div>
 </div>
 <script src="//d3js.org/d3.v4.min.js"></script>
+<script src="imagelayer.js"></script>
 <script src="distcarto.js"></script>
 <script>
 d3.select('#factor').property('value', 1);
@@ -119,11 +132,7 @@ d3.select('#comm').on('change', function () {
   redraw();
 });
 d3.select('#display_grid').on('change', function () {
-  if (this.checked) {
-    layers.select('.grid').attr('class', 'layer grid visible');
-  } else {
-    layers.select('.grid').attr('class', 'layer grid invisible');
-  }
+  layers.select('.grid').classed('visible', this.checked);
 });
 d3.select('#advanced_opts').on('change', function () {
   if (this.checked) {
@@ -231,7 +240,7 @@ d3.queue(3)
         image_pts.push(image_transformed.features[i].geometry.coordinates);
       }
       const c = new DistCarto(source_pts, image_pts, background, precision);
-      const result = c.transform_background();
+      const result = c.transform_layer();
       const transform_grid = c.get_interp_grid();
 
       if (!layers.select('#grid').node()) {
@@ -293,28 +302,6 @@ d3.queue(3)
     };
   });
 
-class Mat {
-  constructor(raw_csv) {
-    this.cells = raw_csv.split('\n').map(line => line.split(',').map(el => (el.startsWith('"') && el.endsWith('"')) ? el.slice(1,-1) : el));
-    this.ref_index = this.cells[0];
-  }
-
-  getTime(id_comm) {
-    const ix = this.ref_index.map((d, i) => d === id_comm ? i : 0).reduce((a, b) => a + b);
-    const times = new Map();
-    for (let i = 1; i < this.cells.length; i++) {
-      const value = this.cells[i][ix];
-      const id = this.ref_index[i];
-      times.set(id, +value);
-    }
-    return times;
-  }
-
-  getAvailableIds() {
-    return this.ref_index.filter(a => a);
-  }
-}
-
 function fitLayer(name) {
   projection.scale(1).translate([0, 0]);
   const b = get_bbox_layer_path(name);
@@ -344,48 +331,6 @@ function populateSelect(available_ids) {
   available_ids.forEach(id => { select.append('option').attr('value', id).text(table.get(id)); });
 }
 
-
-function distance(x1, y1, x2, y2) {
-  const a = x1 - x2;
-  const b = y1 - y2;
-  return sqrt(a * a + b * b);
-}
-
-function point_at(coords_line, normalized_dist) {
-  const a = coords_line[0];
-  const b = coords_line[1];
-  return [
-    (b[0] - a[0]) * normalized_dist + a[0],
-    (b[1] - a[1]) * normalized_dist + a[1],
-  ];
-};
-
-function getImageLayer(source_geojson, mat, my_comm, factor=1) {
-  const image_geojson = JSON.parse(JSON.stringify(source_geojson));
-  const times = mat.getTime(my_comm);
-  const my_feature = image_geojson.features.find(d => d.properties.INSEE_COM === my_comm);
-  const x1 = my_feature.geometry.coordinates[0];
-  const y1 = my_feature.geometry.coordinates[1];
-  image_geojson.features.forEach((ft) => {
-    ft.properties.time = times.get(ft.properties.INSEE_COM);
-    ft.properties.distance_eucl = distance(x1, y1, ft.geometry.coordinates[0], ft.geometry.coordinates[1]);
-    ft.properties.vitesse = ft.properties.distance_eucl / ft.properties.time;
-  });
-  const ref_vitesse = d3.median(image_geojson.features.map(d => d.properties.vitesse).filter(d => !isNaN(d)));
-
-  image_geojson.features.forEach((ft) => {
-    ft.properties.deplacement = ref_vitesse / ft.properties.vitesse;
-  });
-  image_geojson.features.forEach((ft) => {
-    if (ft.properties.INSEE_COM === my_comm) return;
-    const deplacement = 1 + (ft.properties.deplacement - 1) * factor;
-    const line = [[x1, y1], ft.geometry.coordinates];
-    const moved_pt = point_at(line, deplacement);
-    ft.geometry.coordinates = moved_pt;
-  });
-  return image_geojson;
-}
-
 function changeMarkerPos(comm_id) {
   layers.selectAll('#pts > path').attr('class', '');
   layers.select(`#pts > path#ft_${comm_id}`).attr('class', 'target');
@@ -404,7 +349,7 @@ function updateOriginGrid(precision) {
   if (!layers.select('#grid').node()) {
     layers.insert('g')
       .attr('id', 'grid')
-      .attr('class', 'layer grid')
+      .attr('class', 'layer grid visible')
       .selectAll('path')
       .data(grid.features)
       .enter()

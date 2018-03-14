@@ -161,7 +161,6 @@ class Grid {
     const width = this.width;
     const height = this.height;
     const rect_dim = this.rect_width * this.rect_height;
-    const get_smoothed = this.get_smoothed;
 
     let ux1, ux2, vy1, vy2, u, v, w, qx, qy, deltaZx, deltaZy, sQx, sQy, sW;
     let hx1, hx2, HX, hy1, hy2, HY;
@@ -173,10 +172,10 @@ class Grid {
         const adj_pt = img_points[ix];
         const adj_nodes = this.get_adj_nodes(src_pt);
         const smoothed_nodes = [
-          get_smoothed(adj_nodes[0].i, adj_nodes[0].j),
-          get_smoothed(adj_nodes[1].i, adj_nodes[1].j),
-          get_smoothed(adj_nodes[2].i, adj_nodes[2].j),
-          get_smoothed(adj_nodes[3].i, adj_nodes[3].j)
+          this.get_smoothed(adj_nodes[0].i, adj_nodes[0].j),
+          this.get_smoothed(adj_nodes[1].i, adj_nodes[1].j),
+          this.get_smoothed(adj_nodes[2].i, adj_nodes[2].j),
+          this.get_smoothed(adj_nodes[3].i, adj_nodes[3].j)
         ];
 
         ux1 = src_pt.x - adj_nodes[0].source.x;
@@ -231,7 +230,7 @@ class Grid {
             if (n.weight === 0) {
               p_tmp.x = n.interp.x;
               p_tmp.y = n.interp.y;
-              _p = get_smoothed(i, j);
+              _p = this.get_smoothed(i, j);
               n.interp.x = _p.x;
               n.interp.y = _p.y;
               delta = max(delta, p_tmp.distance(n.interp) / rect_dim);
@@ -356,6 +355,8 @@ function getTotalBounds(geojson) {
       geom.coordinates.forEach(ring => _getBoundingRect(ring));
     } else if (geom.type === 'MultiPolygon') {
       geom.coordinates.forEach(poly => poly.forEach(ring => _getBoundingRect(ring)));
+    } else if (geom.type === 'LineString' || geom.type === 'MultiPoint') {
+      _getBoundingRect(geom.coordinates);
     }
   }
   return [minx, miny, maxx, maxy];
@@ -363,13 +364,19 @@ function getTotalBounds(geojson) {
 
 class DistCarto {
   constructor(source_pts_coordinates, image_pts_coordinates, background, precision) {
-    this.background = JSON.parse(JSON.stringify(background));
-    const rect = getTotalBounds(background);
     this.source = [];
     this.image = [];
     for (let i = 0; i < source_pts_coordinates.length; i++) {
       this.source.push(new Point(source_pts_coordinates[i][0], source_pts_coordinates[i][1]));
       this.image.push(new Point(image_pts_coordinates[i][0], image_pts_coordinates[i][1]));
+    }
+    let rect;
+    if (background) {
+      this.background = JSON.parse(JSON.stringify(background));
+      rect = getTotalBounds(background);
+    } else {
+      this.background = null;
+      rect = getBoundingRect(this.source, true);
     }
     this.grid = new Grid(this.source, precision, rect);
     this.grid.interpolate(this.image, this._get_inter_nb_iter(4));
@@ -379,17 +386,28 @@ class DistCarto {
     return (coef_iter * sqrt(this.source.length)) | 0;
   }
 
-  transform_background() {
+  transform_layer(layer) {
     const grid = this.grid;
-    const features = this.background.features;
+    let t;
+    let features;
+    if (layer) {
+      t = JSON.parse(JSON.stringify(layer));
+      features = t.features;
+    } else if (this.background) {
+      features = this.background.features;
+    } else {
+      throw "A layer to transform is requested";
+    }
     features.forEach((ft) => {
       const geom = ft.geometry;
-      if (geom.type === 'Polygon') {
+      if (geom.type === 'Polygon' || geom.type === 'MultiLineString') {
         geom.coordinates = geom.coordinates.map(
           ring => ring.map(pt => grid._interp_point(pt[0], pt[1])));
       } else if (geom.type === 'MultiPolygon') {
         geom.coordinates = geom.coordinates.map(
           polys => polys.map(ring => ring.map(pt => grid._interp_point(pt[0], pt[1]))));
+      } else if (geom.type === 'LineString' || geom.type === 'MultiPoint') {
+        geom.coordinates = geom.coordinates.map(pt => grid._interp_point(pt[0], pt[1]));
       }
     });
     return this.background;
@@ -399,7 +417,6 @@ class DistCarto {
     const features = [];
     for (let i = 0; i < this.grid.height - 1; i++) {
       for (let j = 0; j < this.grid.width - 1; j++) {
-
         features.push({
           type: 'Feature',
           properties: {},

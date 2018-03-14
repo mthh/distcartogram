@@ -1,5 +1,5 @@
 ## DistCartogram
-**Work still in progress.**
+**Work in progress.**
 
 *Distance cartogram* from a set of source points and time matrix between them.  
 Time matrix is used to create a layer of image points.  
@@ -16,12 +16,13 @@ Directly adapted from [Darcy](http://thema.univ-fcomte.fr/production/logiciels/1
 Load the background shape to be deformed:
 ```
 import geopandas as gpd
+import pandas as pd
 background = gpd.read_file('data/depfr_simple.geojson')
 background.plot()
 ```
 ![background_plot](https://raw.githubusercontent.com/mthh/distcartogram/master/misc/background.png)
 
-Load the source points layer and the a matrix of time between these points:
+Load the source points layer and a matrix of time between these points:
 ```
 source = gpd.read_file('data/source_pref.geojson')
 mat = pd.read_csv('data/mat.csv')
@@ -44,6 +45,6 @@ result.plot()
 
 #### Credits - License:
 
-Code is a direct adaptation of [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy)([Sourceforge](https://sourceforge.net/p/jdarcy/wiki/Home/)) software (G. Vuidel and C. Cauvin - released under GPLv3).  
+Code is a direct adaptation of [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy) software (G. Vuidel and C. Cauvin - released under GPLv3 - [Sourceforge](https://sourceforge.net/p/jdarcy/wiki/Home/).  
 
 Motivated by the wish to see if there is a possible interest or difficulty to integrate this method in another environment than Darcy, such as [Magrit](https://github.com/riatelab/magrit) or a qgis plugin.
