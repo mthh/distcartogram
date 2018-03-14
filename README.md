@@ -8,7 +8,7 @@ Directly adapted from [Darcy](http://thema.univ-fcomte.fr/production/logiciels/1
 
 
 
-#### Online example (JS):
+### Online example (JS):
 [mthh.github.io/distcartogram/js](https://mthh.github.io/distcartogram/js)
 
 
@@ -22,7 +22,7 @@ background.plot()
 ```
 ![background_plot](https://raw.githubusercontent.com/mthh/distcartogram/master/misc/background.png)
 
-Load the source points layer and a matrix of time between these points:
+Load the source points layer and a time matrix between these points:
 ```
 source = gpd.read_file('data/source_pref.geojson')
 mat = pd.read_csv('data/mat.csv')
@@ -45,6 +45,6 @@ result.plot()
 
 #### Credits - License:
 
-Code is a direct adaptation of [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy) software (G. Vuidel and C. Cauvin - released under GPLv3 - [Sourceforge](https://sourceforge.net/p/jdarcy/wiki/Home/).  
+Code is a direct adaptation of [Darcy](http://thema.univ-fcomte.fr/production/logiciels/16-categories-en-francais/cat-productions-fr/cat-logiciels-fr/294-art-darcy) software (G. Vuidel and C. Cauvin - released under GPLv3 - [Sourceforge](https://sourceforge.net/p/jdarcy/wiki/Home/)).  
 
 Motivated by the wish to see if there is a possible interest or difficulty to integrate this method in another environment than Darcy, such as [Magrit](https://github.com/riatelab/magrit) or a qgis plugin.
